@@ -4,6 +4,13 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -13,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # full history needed for release notes generation
+          fetch-depth: 0
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -28,15 +35,15 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/
-          key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          key: linux-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build release binary
+      - name: Build
         run: cargo build --release --bin transy-platform
 
-      - name: Rename binary
+      - name: Rename
         run: mv target/release/transy-platform transy-linux-x86_64
 
-      - name: Create GitHub Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: transy-linux-x86_64
@@ -63,7 +70,7 @@ jobs:
             target/
           key: macos-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build macOS universal binary
+      - name: Build universal binary
         run: |
           cargo build --release --bin transy-platform --target x86_64-apple-darwin
           cargo build --release --bin transy-platform --target aarch64-apple-darwin
@@ -72,7 +79,8 @@ jobs:
             target/aarch64-apple-darwin/release/transy-platform \
             -output transy-macos-universal
 
-      - name: Upload to GitHub Release
+      - name: Upload to existing Release
         uses: softprops/action-gh-release@v2
         with:
           files: transy-macos-universal
+          append_body: false

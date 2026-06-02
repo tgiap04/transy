@@ -27,7 +27,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install system dependencies
-        run: sudo apt-get install -y pkg-config libxkbcommon-dev dpkg-dev
+        run: sudo apt-get install -y pkg-config libxkbcommon-dev dpkg-dev libgtk-3-dev libayatana-appindicator3-dev
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -42,11 +42,13 @@ jobs:
         id: version
         run: echo "VERSION_NUM=${VERSION#v}" >> $GITHUB_OUTPUT
 
+      - name: Build release
+        run: cargo build --release --bin transy-platform
+
       - name: Build .deb package
         run: |
           cargo install cargo-deb
           cargo deb -p transy-platform
-          # Rename with version: transy_0.0.1_amd64.deb
           cp target/debian/*.deb "transy_${{ steps.version.outputs.VERSION_NUM }}_amd64.deb"
 
       - name: Upload .deb
@@ -61,6 +63,17 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Detect architecture
+        id: arch
+        run: |
+          ARCH=$(uname -m)
+          echo "HOST_ARCH=$ARCH" >> $GITHUB_OUTPUT
+          if [ "$ARCH" = "arm64" ]; then
+            echo "NEEDS_INTEL=true" >> $GITHUB_OUTPUT
+          else
+            echo "NEEDS_INTEL=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -80,17 +93,15 @@ jobs:
         id: version
         run: echo "VERSION_NUM=${VERSION#v}" >> $GITHUB_OUTPUT
 
-      - name: Build .dmg (Intel)
+      - name: Build Apple Silicon binary
+        run: cargo build --release --bin transy-platform --target aarch64-apple-darwin
+
+      - name: Build Intel binary (if on Silicon runner)
+        if: runner.arch == 'ARM64'
         run: |
-          mkdir -p /tmp/transy-dmg-intel
-          cp target/x86_64-apple-darwin/release/transy-platform /tmp/transy-dmg-intel/
-          echo "Transy v${{ steps.version.outputs.VERSION_NUM }} — On-demand pop-up translator" > /tmp/transy-dmg-intel/README.txt
-          hdiutil create /tmp/transy-dmg-intel.dmg \
-            -volname "Transy" \
-            -fs HFS+ \
-            -srcfolder /tmp/transy-dmg-intel \
-            -format UDZO
-          mv /tmp/transy-dmg-intel.dmg "transy_${{ steps.version.outputs.VERSION_NUM }}_intel_x86_64.dmg"
+          sudo mdutil -i off / 2>/dev/null || true
+          rustup target add x86_64-apple-darwin
+          cargo build --release --bin transy-platform --target x86_64-apple-darwin
 
       - name: Build .dmg (Silicon)
         run: |
@@ -104,10 +115,23 @@ jobs:
             -format UDZO
           mv /tmp/transy-dmg-silicon.dmg "transy_${{ steps.version.outputs.VERSION_NUM }}_silicon_aarch64.dmg"
 
+      - name: Build .dmg (Intel)
+        if: runner.arch == 'ARM64'
+        run: |
+          mkdir -p /tmp/transy-dmg-intel
+          cp target/x86_64-apple-darwin/release/transy-platform /tmp/transy-dmg-intel/
+          echo "Transy v${{ steps.version.outputs.VERSION_NUM }} — On-demand pop-up translator" > /tmp/transy-dmg-intel/README.txt
+          hdiutil create /tmp/transy-dmg-intel.dmg \
+            -volname "Transy" \
+            -fs HFS+ \
+            -srcfolder /tmp/transy-dmg-intel \
+            -format UDZO
+          mv /tmp/transy-dmg-intel.dmg "transy_${{ steps.version.outputs.VERSION_NUM }}_intel_x86_64.dmg"
+
       - name: Upload DMG files
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            transy_${{ steps.version.outputs.VERSION_NUM }}_intel_x86_64.dmg
             transy_${{ steps.version.outputs.VERSION_NUM }}_silicon_aarch64.dmg
+            transy_${{ steps.version.outputs.VERSION_NUM }}_intel_x86_64.dmg
           generate_release_notes: false

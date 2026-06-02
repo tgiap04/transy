@@ -11,12 +11,12 @@
 ---
 
 ## Phase 1: Text Capture — Epic E1
-**Status:** ⬜ Not Started | **Target:** Week 2
+**Status:** ✅ Complete | **Completed:** 2026-06-02
 
-- [ ] **TR-01:** Ubuntu GNOME text capture (xclip + wl-paste)
-- [ ] **TR-02:** macOS text capture (args + pbpaste fallback)
-- [ ] Platform detection at runtime
-- [ ] No-selection → clean exit (exit 0)
+- [x] **TR-01:** Ubuntu GNOME text capture (xclip + wl-paste)
+- [x] **TR-02:** macOS text capture (args + pbpaste fallback)
+- [x] Platform detection at runtime
+- [x] No-selection → clean exit (exit 0)
 
 ---
 

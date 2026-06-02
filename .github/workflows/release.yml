@@ -15,45 +15,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build-linux:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install system dependencies
-        run: sudo apt-get install -y pkg-config libssl-dev libxkbcommon-dev
-
-      - name: Cache cargo
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target/
-          key: linux-cargo-release-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Build
-        run: cargo build --release --bin transy-platform
-
-      - name: Rename
-        run: mv target/release/transy-platform transy-linux-x86_64
-
-      - name: Upload artifact
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./transy-linux-x86_64
-          asset_name: transy-linux-x86_64
-          asset_content_type: application/octet-stream
-    needs: create-release
-
-  build-macos:
-    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -64,6 +27,9 @@ jobs:
         with:
           targets: x86_64-apple-darwin,aarch64-apple-darwin
 
+      - name: Install Linux system dependencies
+        run: sudo apt-get install -y pkg-config libssl-dev libxkbcommon-dev
+
       - name: Cache cargo
         uses: actions/cache@v4
         with:
@@ -71,37 +37,31 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target/
-          key: macos-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+          key: cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build universal binary
+      - name: Build Linux binary
+        run: cargo build --release --bin transy-platform
+
+      - name: Build macOS x86_64
+        run: cargo build --release --bin transy-platform --target x86_64-apple-darwin
+
+      - name: Build macOS ARM64
+        run: cargo build --release --bin transy-platform --target aarch64-apple-darwin
+
+      - name: Create macOS universal binary
         run: |
-          cargo build --release --bin transy-platform --target x86_64-apple-darwin
-          cargo build --release --bin transy-platform --target aarch64-apple-darwin
           lipo -create \
             target/x86_64-apple-darwin/release/transy-platform \
             target/aarch64-apple-darwin/release/transy-platform \
             -output transy-macos-universal
 
-      - name: Upload artifact
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./transy-macos-universal
-          asset_name: transy-macos-universal
-          asset_content_type: application/octet-stream
-    needs: create-release
-
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create.outputs.upload_url }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: Rename Linux binary
+        run: mv target/release/transy-platform transy-linux-x86_64
 
       - name: Create GitHub Release
-        id: create
         uses: softprops/action-gh-release@v2
         with:
+          files: |
+            transy-linux-x86_64
+            transy-macos-universal
           generate_release_notes: true

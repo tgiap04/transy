@@ -16,7 +16,7 @@ env:
 
 jobs:
   build-linux:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,11 +43,14 @@ jobs:
       - name: Rename
         run: mv target/release/transy-platform transy-linux-x86_64
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
         with:
-          files: transy-linux-x86_64
-          generate_release_notes: true
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./transy-linux-x86_64
+          asset_name: transy-linux-x86_64
+          asset_content_type: application/octet-stream
+    needs: create-release
 
   build-macos:
     runs-on: macos-latest
@@ -79,8 +82,26 @@ jobs:
             target/aarch64-apple-darwin/release/transy-platform \
             -output transy-macos-universal
 
-      - name: Upload to existing Release
+      - name: Upload artifact
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ needs.create-release.outputs.upload_url }}
+          asset_path: ./transy-macos-universal
+          asset_name: transy-macos-universal
+          asset_content_type: application/octet-stream
+    needs: create-release
+
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create.outputs.upload_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub Release
+        id: create
         uses: softprops/action-gh-release@v2
         with:
-          files: transy-macos-universal
-          append_body: false
+          generate_release_notes: true

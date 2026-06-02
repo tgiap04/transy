@@ -9,7 +9,6 @@ maintainer = "tgiap.dev"
 extended-description = "Minimal on-demand pop-up translator for Linux and macOS"
 section = "翻译"
 priority = "optional"
-license = "MIT"
 
 [dependencies]
 transy-core = { path = "../transy-core" }

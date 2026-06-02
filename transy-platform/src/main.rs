@@ -1,11 +1,22 @@
 mod mouse;
 mod tooltip;
 
+use std::sync::{Arc, Mutex};
+
+use eframe::{App, NativeOptions};
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager};
 use global_hotkey::hotkey::{HotKey, Modifiers, Code};
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem};
 use tray_icon::{TrayIconBuilder, Icon};
 use transy_core::block_on;
+
+#[cfg(target_os = "macos")]
+fn hide_dock_icon() {
+    use cocoa::appkit::{NSApp, NSApplication, NSApplicationActivationPolicyAccessory};
+    unsafe {
+        NSApp().setActivationPolicy_(NSApplicationActivationPolicyAccessory);
+    }
+}
 
 fn trigger_tooltip() {
     let (cx, cy) = mouse::get_mouse_position();
@@ -24,7 +35,7 @@ fn trigger_tooltip() {
     tooltip::run_tooltip(translated, tx, ty);
 }
 
-fn setup_tray() -> tray_icon::TrayIcon {
+fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
     let translate_item =
         MenuItem::with_id(MenuId::new("translate"), "Translate clipboard", true, None);
     let quit_item = MenuItem::with_id(MenuId::new("quit"), "Quit", true, None);
@@ -36,6 +47,26 @@ fn setup_tray() -> tray_icon::TrayIcon {
     let (w, h) = rgba.dimensions();
     let icon = Icon::from_rgba(rgba.into_raw(), w, h).expect("icon from RGBA");
 
+    let translate_item_id = translate_item.id().clone();
+    let quit_item_id = quit_item.id().clone();
+    let quit_flag_clone = Arc::clone(&quit_flag);
+
+    std::thread::spawn(move || loop {
+        if let Ok(event) = MenuEvent::receiver().try_recv() {
+            match event.id.as_ref() {
+                s if s == quit_item_id.as_ref() => {
+                    *quit_flag_clone.lock().unwrap() = true;
+                    break;
+                }
+                s if s == translate_item_id.as_ref() => {
+                    trigger_tooltip();
+                }
+                _ => {}
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    });
+
     TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_icon(icon)
@@ -44,55 +75,58 @@ fn setup_tray() -> tray_icon::TrayIcon {
         .expect("tray icon")
 }
 
-fn register_hotkey() {
-    let manager = GlobalHotKeyManager::new().expect("hotkey manager");
-    let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT);
-    manager.register(hotkey).expect("failed to register hotkey");
+struct TrayHost {
+    quit_flag: Arc<Mutex<bool>>,
+    tray: Option<tray_icon::TrayIcon>,
 }
 
-// ── Linux ────────────────────────────────────────────────────────────────────
-#[cfg(target_os = "linux")]
-mod platform {
-    use gtk::prelude::*;
-
-    pub fn run() {
-        gtk::init().expect("gtk init");
-        super::run_event_loop();
-        gtk::main();
+impl TrayHost {
+    fn new() -> Self {
+        let quit_flag = Arc::new(Mutex::new(false));
+        Self { quit_flag, tray: None }
     }
 }
 
-// ── macOS & others ───────────────────────────────────────────────────────────
-#[cfg(not(target_os = "linux"))]
-mod platform {
-    pub fn run() {
-        super::run_event_loop();
-    }
-}
+impl App for TrayHost {
+    fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
+        // macOS requires tray icon created after event loop is running
+        if self.tray.is_none() {
+            self.tray = Some(build_tray_icon(Arc::clone(&self.quit_flag)));
+        }
 
-fn run_event_loop() {
-    let _tray = setup_tray();
-    register_hotkey();
-
-    loop {
-        while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
+        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             if event.state == global_hotkey::HotKeyState::Pressed {
                 trigger_tooltip();
             }
         }
 
-        if let Ok(event) = MenuEvent::receiver().try_recv() {
-            match event.id.as_ref() {
-                "quit" => break,
-                "translate" => trigger_tooltip(),
-                _ => {}
-            }
+        if *self.quit_flag.lock().unwrap() {
+            ctx.send_viewport_cmd(eframe::egui::ViewportCommand::Close);
         }
 
-        std::thread::sleep(std::time::Duration::from_millis(50));
+        ctx.request_repaint();
     }
 }
 
 fn main() {
-    platform::run();
+    #[cfg(target_os = "macos")]
+    hide_dock_icon();
+
+    let manager = GlobalHotKeyManager::new().expect("hotkey manager");
+    let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT);
+    if let Err(e) = manager.register(hotkey) {
+        eprintln!("hotkey error: {e}");
+    }
+
+    let options = NativeOptions {
+        viewport: eframe::egui::ViewportBuilder::default()
+            .with_decorations(false)
+            .with_inner_size([1.0, 1.0])
+            .with_resizable(false)
+            .with_visible(false),
+        ..Default::default()
+    };
+
+    eframe::run_native("Transy", options, Box::new(|_cc| Ok(Box::new(TrayHost::new()))))
+        .expect("eframe");
 }

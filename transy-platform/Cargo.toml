@@ -19,5 +19,8 @@ tray-icon = "0.24"
 global-hotkey = "0.8"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.25"
+
 [target.'cfg(target_os = "linux")'.dependencies]
-gtk = "0.18"
+# tray-icon uses libayatana-appindicator3 via pkg-config — no gtk crate needed

@@ -1,20 +1,74 @@
 mod mouse;
 mod tooltip;
 
-use transy_core::{capture_text, translate};
+use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager};
+use global_hotkey::hotkey::{HotKey, Modifiers, Code};
+use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem};
+use tray_icon::{TrayIconBuilder, Icon};
+use transy_core::block_on;
 
-#[tokio::main]
-async fn main() {
-    let Some(text) = capture_text() else {
-        std::process::exit(0);
+fn trigger_tooltip() {
+    let (cx, cy) = mouse::get_mouse_position();
+    let (tx, ty) = tooltip::clamp_position(cx, cy);
+
+    let text = match transy_core::capture_text() {
+        Some(t) => t,
+        None => return,
     };
 
-    let display = match translate(&text).await {
-        Ok(translated) => translated,
+    let translated = match block_on(transy_core::translate(&text)) {
+        Ok(t) => t,
         Err(e) => e.to_vietnamese().to_string(),
     };
 
-    let (cx, cy) = mouse::get_mouse_position();
-    let (tx, ty) = tooltip::clamp_position(cx, cy);
-    tooltip::run_tooltip(display, tx, ty);
+    tooltip::run_tooltip(translated, tx, ty);
+}
+
+fn main() {
+    // Build menu
+    let translate_item = MenuItem::with_id(MenuId::new("translate"), "Translate clipboard", true, None);
+    let quit_item = MenuItem::with_id(MenuId::new("quit"), "Quit", true, None);
+    let menu = Menu::with_items(&[&translate_item, &quit_item]).expect("menu");
+
+    // Load icon
+    let icon_bytes = include_bytes!("../assets/icon.png");
+    let img = image::load_from_memory(icon_bytes).expect("valid icon");
+    let rgba = img.to_rgba8();
+    let (w, h) = rgba.dimensions();
+    let icon = Icon::from_rgba(rgba.into_raw(), w, h).expect("icon from RGBA");
+
+    // Build tray icon
+    let _tray = TrayIconBuilder::new()
+        .with_menu(Box::new(menu))
+        .with_icon(icon)
+        .with_tooltip("Transy — pop-up translator")
+        .build()
+        .expect("tray icon");
+
+    // Register global hotkey: CmdOrCtrl+Shift+T
+    let manager = GlobalHotKeyManager::new().expect("hotkey manager");
+    let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT);
+    manager.register(hotkey).expect("failed to register hotkey");
+
+    // Keep running; the tray icon owns the menu bar slot
+    loop {
+        // Listen for hotkey events
+        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
+            if event.state == global_hotkey::HotKeyState::Pressed {
+                trigger_tooltip();
+            }
+        }
+
+        // Listen for menu events
+        if let Ok(event) = MenuEvent::receiver().try_recv() {
+            if event.id.as_ref() == "quit" {
+                break;
+            }
+            if event.id.as_ref() == "translate" {
+                trigger_tooltip();
+            }
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
 }

@@ -1,0 +1,17 @@
+changelog:
+  categories:
+    - title: "🚀 Features"
+      labels:
+        - "feat"
+      exclude:
+        labels:
+          - "skip-changelog"
+    - title: "🐛 Bug Fixes"
+      labels:
+        - "fix"
+    - title: "🔧 Other Changes"
+      labels:
+        - "*"
+  exclude:
+    labels:
+      - "skip-changelog"

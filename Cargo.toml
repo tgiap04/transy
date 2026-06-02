@@ -1,3 +1,9 @@
 [workspace]
 members = ["transy-core", "transy-platform"]
 resolver = "2"
+
+[profile.release]
+strip = true
+opt-level = 3
+lto = true
+codegen-units = 1

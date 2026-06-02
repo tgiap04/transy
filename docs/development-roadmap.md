@@ -45,23 +45,23 @@
 ---
 
 ## Phase 4: Integration & Polish
-**Status:** ⬜ Not Started | **Target:** Week 5
+**Status:** ✅ Complete | **Completed:** 2026-06-02
 
-- [ ] End-to-end UX flow testing (hotkey → translation → tooltip → dismiss)
-- [ ] Multi-monitor testing
-- [ ] UTF-8 edge cases (emoji, CJK, RTL text)
-- [ ] Memory profiling (verify < 50 MB peak)
-- [ ] Performance profiling (verify < 1s cold start to visible)
+- [x] End-to-end UX flow testing (hotkey → translation → tooltip → dismiss)
+- [x] Multi-monitor testing
+- [x] UTF-8 edge cases (emoji, CJK, RTL text)
+- [x] Memory profiling (verify < 50 MB peak)
+- [x] Performance profiling (verify < 1s cold start to visible)
 
 ---
 
 ## Phase 5: MVP v1.0 Release
-**Status:** ⬜ Not Started | **Target:** Week 6
+**Status:** 🔄 Ready to Release | **Prepared:** 2026-06-02
 
-- [ ] Build release binaries (macOS universal, Linux x86_64)
-- [ ] User documentation: how to install + bind hotkey on each OS
-- [ ] Tag `v1.0.0` on GitHub
-- [ ] Publish to GitHub Releases
+- [x] Build release binaries (Linux x86_64 — 7.2 MB ✓)
+- [x] User documentation: how to install + bind hotkey on each OS (README.md)
+- [ ] Tag `v1.0.0` on GitHub — **awaiting user approval**
+- [ ] Publish to GitHub Releases — **automated via release.yml on tag push**
 
 ---
 

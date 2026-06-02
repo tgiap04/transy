@@ -40,4 +40,10 @@ mod tests {
         let text = "  hello world  ".trim().to_string();
         assert_eq!(text, "hello world");
     }
+
+    #[test]
+    fn emoji_text_trimmed_correctly() {
+        let text = "  🎉 hello 🌍  ".trim().to_string();
+        assert_eq!(text, "🎉 hello 🌍");
+    }
 }

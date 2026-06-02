@@ -6,7 +6,7 @@ edition = "2024"
 [package.metadata.deb]
 name = "transy"
 maintainer = "tgiap.dev"
-description = "Minimal on-demand pop-up translator for Linux and macOS"
+extended-description = "Minimal on-demand pop-up translator for Linux and macOS"
 section = "翻译"
 priority = "optional"
 license = "MIT"

@@ -3457,6 +3457,7 @@ dependencies = [
  "eframe",
  "egui",
  "global-hotkey",
+ "gtk",
  "image",
  "tokio",
  "transy-core",

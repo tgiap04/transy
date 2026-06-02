@@ -24,51 +24,75 @@ fn trigger_tooltip() {
     tooltip::run_tooltip(translated, tx, ty);
 }
 
-fn main() {
-    // Build menu
-    let translate_item = MenuItem::with_id(MenuId::new("translate"), "Translate clipboard", true, None);
+fn setup_tray() -> tray_icon::TrayIcon {
+    let translate_item =
+        MenuItem::with_id(MenuId::new("translate"), "Translate clipboard", true, None);
     let quit_item = MenuItem::with_id(MenuId::new("quit"), "Quit", true, None);
     let menu = Menu::with_items(&[&translate_item, &quit_item]).expect("menu");
 
-    // Load icon
     let icon_bytes = include_bytes!("../assets/icon.png");
     let img = image::load_from_memory(icon_bytes).expect("valid icon");
     let rgba = img.to_rgba8();
     let (w, h) = rgba.dimensions();
     let icon = Icon::from_rgba(rgba.into_raw(), w, h).expect("icon from RGBA");
 
-    // Build tray icon
-    let _tray = TrayIconBuilder::new()
+    TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_icon(icon)
         .with_tooltip("Transy — pop-up translator")
         .build()
-        .expect("tray icon");
+        .expect("tray icon")
+}
 
-    // Register global hotkey: CmdOrCtrl+Shift+T
+fn register_hotkey() {
     let manager = GlobalHotKeyManager::new().expect("hotkey manager");
     let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT);
     manager.register(hotkey).expect("failed to register hotkey");
+}
 
-    // Keep running; the tray icon owns the menu bar slot
+// ── Linux ────────────────────────────────────────────────────────────────────
+#[cfg(target_os = "linux")]
+mod platform {
+    use gtk::prelude::*;
+
+    pub fn run() {
+        gtk::init().expect("gtk init");
+        super::run_event_loop();
+        gtk::main();
+    }
+}
+
+// ── macOS & others ───────────────────────────────────────────────────────────
+#[cfg(not(target_os = "linux"))]
+mod platform {
+    pub fn run() {
+        super::run_event_loop();
+    }
+}
+
+fn run_event_loop() {
+    let _tray = setup_tray();
+    register_hotkey();
+
     loop {
-        // Listen for hotkey events
-        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
+        while let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
             if event.state == global_hotkey::HotKeyState::Pressed {
                 trigger_tooltip();
             }
         }
 
-        // Listen for menu events
         if let Ok(event) = MenuEvent::receiver().try_recv() {
-            if event.id.as_ref() == "quit" {
-                break;
-            }
-            if event.id.as_ref() == "translate" {
-                trigger_tooltip();
+            match event.id.as_ref() {
+                "quit" => break,
+                "translate" => trigger_tooltip(),
+                _ => {}
             }
         }
 
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
+}
+
+fn main() {
+    platform::run();
 }

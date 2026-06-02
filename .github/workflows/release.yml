@@ -13,6 +13,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  VERSION: ${{ github.ref_name }}
 
 jobs:
   build-linux:
@@ -41,15 +42,13 @@ jobs:
         run: |
           cargo install cargo-deb
           cargo deb -p transy-platform
-          cp target/debian/*.deb transy_amd64.deb
-
-      - name: Verify .deb
-        run: dpkg --info transy_amd64.deb
+          # Rename with version: transy_0.0.1_amd64.deb
+          cp target/debian/*.deb "transy_${VERSION#v}_amd64.deb"
 
       - name: Upload .deb
         uses: softprops/action-gh-release@v1
         with:
-          files: transy_amd64.deb
+          files: "transy_${VERSION#v}_amd64.deb"
           generate_release_notes: false
 
   build-macos:
@@ -83,30 +82,30 @@ jobs:
         run: |
           mkdir -p /tmp/transy-dmg-intel
           cp target/x86_64-apple-darwin/release/transy-platform /tmp/transy-dmg-intel/
-          echo "Transy — On-demand pop-up translator" > /tmp/transy-dmg-intel/README.txt
+          echo "Transy v${VERSION#v} — On-demand pop-up translator" > /tmp/transy-dmg-intel/README.txt
           hdiutil create /tmp/transy-dmg-intel.dmg \
             -volname "Transy" \
             -fs HFS+ \
             -srcfolder /tmp/transy-dmg-intel \
             -format UDZO
-          mv /tmp/transy-dmg-intel.dmg transy_intel_x86_64.dmg
+          mv /tmp/transy-dmg-intel.dmg "transy_${VERSION#v}_intel_x86_64.dmg"
 
       - name: Build .dmg (Silicon)
         run: |
           mkdir -p /tmp/transy-dmg-silicon
           cp target/aarch64-apple-darwin/release/transy-platform /tmp/transy-dmg-silicon/
-          echo "Transy — On-demand pop-up translator" > /tmp/transy-dmg-silicon/README.txt
+          echo "Transy v${VERSION#v} — On-demand pop-up translator" > /tmp/transy-dmg-silicon/README.txt
           hdiutil create /tmp/transy-dmg-silicon.dmg \
             -volname "Transy" \
             -fs HFS+ \
             -srcfolder /tmp/transy-dmg-silicon \
             -format UDZO
-          mv /tmp/transy-dmg-silicon.dmg transy_silicon_aarch64.dmg
+          mv /tmp/transy-dmg-silicon.dmg "transy_${VERSION#v}_silicon_aarch64.dmg"
 
       - name: Upload DMG files
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            transy_intel_x86_64.dmg
-            transy_silicon_aarch64.dmg
+            "transy_${VERSION#v}_intel_x86_64.dmg"
+            "transy_${VERSION#v}_silicon_aarch64.dmg"
           generate_release_notes: false

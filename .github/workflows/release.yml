@@ -26,7 +26,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install system dependencies
-        run: sudo apt-get install -y pkg-config libssl-dev libxkbcommon-dev
+        run: sudo apt-get install -y pkg-config libssl-dev libxkbcommon-dev dpkg-dev
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -37,16 +37,19 @@ jobs:
             target/
           key: linux-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build
-        run: cargo build --release --bin transy-platform
+      - name: Build .deb package
+        run: |
+          cargo install cargo-deb
+          cargo deb --workspace --no-build --output path-output.txt
+          cp target/debian/*.deb transy_amd64.deb
 
-      - name: Rename
-        run: mv target/release/transy-platform transy-linux-x86_64
+      - name: Verify .deb
+        run: dpkg --info transy_amd64.deb
 
-      - name: Upload Linux binary
+      - name: Upload .deb
         uses: softprops/action-gh-release@v1
         with:
-          files: transy-linux-x86_64
+          files: transy_amd64.deb
           generate_release_notes: false
 
   build-macos:
@@ -70,21 +73,40 @@ jobs:
             target/
           key: macos-cargo-release-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build x86_64
+      - name: Build binary (Intel)
         run: cargo build --release --bin transy-platform --target x86_64-apple-darwin
 
-      - name: Build ARM64
+      - name: Build binary (Silicon)
         run: cargo build --release --bin transy-platform --target aarch64-apple-darwin
 
-      - name: Rename binaries
+      - name: Build .dmg (Intel)
         run: |
-          mv target/x86_64-apple-darwin/release/transy-platform transy-macos-intel
-          mv target/aarch64-apple-darwin/release/transy-platform transy-macos-silicon
+          mkdir -p /tmp/transy-dmg-intel
+          cp target/x86_64-apple-darwin/release/transy-platform /tmp/transy-dmg-intel/
+          echo "Transy — On-demand pop-up translator" > /tmp/transy-dmg-intel/README.txt
+          hdiutil create /tmp/transy-dmg-intel.dmg \
+            -volname "Transy" \
+            -fs HFS+ \
+            -srcfolder /tmp/transy-dmg-intel \
+            -format UDZO
+          mv /tmp/transy-dmg-intel.dmg transy_intel.dmg
 
-      - name: Upload macOS binaries
+      - name: Build .dmg (Silicon)
+        run: |
+          mkdir -p /tmp/transy-dmg-silicon
+          cp target/aarch64-apple-darwin/release/transy-platform /tmp/transy-dmg-silicon/
+          echo "Transy — On-demand pop-up translator" > /tmp/transy-dmg-silicon/README.txt
+          hdiutil create /tmp/transy-dmg-silicon.dmg \
+            -volname "Transy" \
+            -fs HFS+ \
+            -srcfolder /tmp/transy-dmg-silicon \
+            -format UDZO
+          mv /tmp/transy-dmg-silicon.dmg transy_silicon.dmg
+
+      - name: Upload DMG files
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            transy-macos-intel
-            transy-macos-silicon
+            transy_intel.dmg
+            transy_silicon.dmg
           generate_release_notes: false

@@ -3,6 +3,14 @@ name = "transy-platform"
 version = "0.1.0"
 edition = "2024"
 
+[package.metadata.deb]
+name = "transy"
+maintainer = "tgiap.dev"
+description = "Minimal on-demand pop-up translator for Linux and macOS"
+section = "翻译"
+priority = "optional"
+license = "MIT"
+
 [dependencies]
 transy-core = { path = "../transy-core" }
 egui = "0.31"

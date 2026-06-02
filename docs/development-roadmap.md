@@ -1,12 +1,12 @@
 # Development Roadmap — Transy
 
 ## Phase 0: Project Setup
-**Status:** ⬜ Not Started | **Target:** Week 1
+**Status:** ✅ Complete | **Completed:** 2026-06-02
 
-- [ ] Initialize Rust project with Cargo
-- [ ] Configure workspace structure (`transy-core`, `transy-platform`)
-- [ ] Set up CI/CD (GitHub Actions: build + test + lint)
-- [ ] Add dependencies: `reqwest`, `tokio`, `egui`, `eframe`, `serde`, `serde_json`
+- [x] Initialize Rust project with Cargo
+- [x] Configure workspace structure (`transy-core`, `transy-platform`)
+- [x] Set up CI/CD (GitHub Actions: build + test + lint)
+- [x] Add dependencies: `reqwest`, `tokio`, `egui`, `eframe`, `serde`, `serde_json`
 
 ---
 

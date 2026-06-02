@@ -1,0 +1,3 @@
+[workspace]
+members = ["transy-core", "transy-platform"]
+resolver = "2"

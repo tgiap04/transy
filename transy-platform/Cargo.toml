@@ -1,0 +1,10 @@
+[package]
+name = "transy-platform"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+transy-core = { path = "../transy-core" }
+egui = "0.31"
+eframe = { version = "0.31", default-features = false, features = ["default_fonts", "x11", "wayland"] }
+tokio = { version = "1", features = ["full"] }

@@ -1,0 +1,20 @@
+# Rust build artifacts
+/target/
+transy-core/target/
+transy-platform/target/
+
+# Cargo lock is committed for binaries — do NOT ignore Cargo.lock
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Environment / secrets
+.env
+.env.*
+
+# OS
+Thumbs.db

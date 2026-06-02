@@ -21,26 +21,26 @@
 ---
 
 ## Phase 2: Translation Engine — Epic E2
-**Status:** ⬜ Not Started | **Target:** Week 3
+**Status:** ✅ Complete | **Completed:** 2026-06-02
 
-- [ ] **TR-03:** HTTP client + Google Translate API integration
-- [ ] Auto language detection (`source=auto`)
-- [ ] Offline/error handling (friendly Vietnamese error message)
-- [ ] Long text truncation
-- [ ] Performance benchmark (< 200ms local processing)
+- [x] **TR-03:** HTTP client + Google Translate API integration
+- [x] Auto language detection (`source=auto`)
+- [x] Offline/error handling (friendly Vietnamese error message)
+- [x] Long text truncation
+- [x] Performance benchmark (< 200ms local processing)
 
 ---
 
 ## Phase 3: Tooltip UI — Epic E3
-**Status:** ⬜ Not Started | **Target:** Week 4
+**Status:** ✅ Complete | **Completed:** 2026-06-02
 
-- [ ] **TR-04:** Mouse position capture (xdotool / core-graphics)
-- [ ] egui frameless window at cursor + offset
-- [ ] Screen-edge repositioning
-- [ ] **TR-05:** Dark mode styling
-- [ ] Always-on-top flag
-- [ ] 5-second auto-close timer
-- [ ] Click-to-dismiss
+- [x] **TR-04:** Mouse position capture (xdotool / core-graphics)
+- [x] egui frameless window at cursor + offset
+- [x] Screen-edge repositioning
+- [x] **TR-05:** Dark mode styling
+- [x] Always-on-top flag
+- [x] 5-second auto-close timer
+- [x] Click-to-dismiss
 
 ---
 

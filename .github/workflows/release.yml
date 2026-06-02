@@ -40,7 +40,7 @@ jobs:
       - name: Build .deb package
         run: |
           cargo install cargo-deb
-          cargo deb --workspace --no-build --output path-output.txt
+          cargo deb -p transy-platform
           cp target/debian/*.deb transy_amd64.deb
 
       - name: Verify .deb
@@ -89,7 +89,7 @@ jobs:
             -fs HFS+ \
             -srcfolder /tmp/transy-dmg-intel \
             -format UDZO
-          mv /tmp/transy-dmg-intel.dmg transy_intel.dmg
+          mv /tmp/transy-dmg-intel.dmg transy_intel_x86_64.dmg
 
       - name: Build .dmg (Silicon)
         run: |
@@ -101,12 +101,12 @@ jobs:
             -fs HFS+ \
             -srcfolder /tmp/transy-dmg-silicon \
             -format UDZO
-          mv /tmp/transy-dmg-silicon.dmg transy_silicon.dmg
+          mv /tmp/transy-dmg-silicon.dmg transy_silicon_aarch64.dmg
 
       - name: Upload DMG files
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            transy_intel.dmg
-            transy_silicon.dmg
+            transy_intel_x86_64.dmg
+            transy_silicon_aarch64.dmg
           generate_release_notes: false

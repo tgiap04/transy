@@ -94,10 +94,10 @@ impl App for TrayHost {
             self.tray = Some(build_tray_icon(Arc::clone(&self.quit_flag)));
         }
 
-        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv() {
-            if event.state == global_hotkey::HotKeyState::Pressed {
-                trigger_tooltip();
-            }
+        if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv()
+            && event.state == global_hotkey::HotKeyState::Pressed
+        {
+            trigger_tooltip();
         }
 
         if *self.quit_flag.lock().unwrap() {

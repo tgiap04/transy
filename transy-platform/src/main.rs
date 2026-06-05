@@ -109,6 +109,9 @@ impl App for TrayHost {
 }
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    gtk::init().expect("failed to initialize GTK");
+
     #[cfg(target_os = "macos")]
     hide_dock_icon();
 
@@ -121,7 +124,8 @@ fn main() {
     let options = NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_decorations(false)
-            .with_inner_size([1.0, 1.0])
+            .with_inner_size([2.0, 2.0])
+            .with_min_inner_size([2.0, 2.0])
             .with_resizable(false)
             .with_visible(false),
         ..Default::default()

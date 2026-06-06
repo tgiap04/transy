@@ -1,3 +1,7 @@
+// Suppress warnings from the objc crate's `sel_impl` macro which references
+// a removed `cargo-clippy` cfg flag from older Rust versions.
+#![allow(unexpected_cfgs)]
+
 #[cfg(target_os = "macos")]
 #[macro_use]
 extern crate objc;

@@ -188,28 +188,6 @@ impl SettingsApp {
 
 impl eframe::App for SettingsApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // On first frame, ensure the viewport has keyboard focus (platform-specific).
-        // This is needed because on macOS the app runs as an accessory — windows
-        // don't auto-activate when shown. Linux decorated windows usually get focus
-        // automatically, but we request it unconditionally for consistency.
-        static FIRST_FRAME: std::sync::Once = std::sync::Once::new();
-        FIRST_FRAME.call_once(|| {
-            #[cfg(target_os = "macos")]
-            {
-                // App runs as accessory — force activate AND bring the key window
-                // to front so keyboard events route to this window.
-                use cocoa::appkit::{NSApp, NSApplication};
-                unsafe {
-                    NSApp().activateIgnoringOtherApps_(true);
-                    let window: cocoa::base::id = msg_send![NSApp(), keyWindow];
-                    if !window.is_null() {
-                        let _: () = msg_send![window, makeKeyAndOrderFront: std::ptr::null::<std::ffi::c_void>()];
-                    }
-                }
-            }
-            ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-        });
-
         // Capture mode: process key events to build a hotkey string.
         if self.capture_mode {
             let mut committed: Option<String> = None;

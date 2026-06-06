@@ -69,6 +69,30 @@ cargo fmt --all -- --check
 
 ---
 
+## Configuration
+
+All settings persist to a JSON file in the platform config dir:
+
+| OS | Path |
+|----|------|
+| macOS | `~/Library/Application Support/transy/config.json` |
+| Linux | `~/.config/transy/config.json` |
+
+Open the GUI: right-click the tray icon → **Settings...**.
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| Hotkey | `Cmd+Shift+T` | Global shortcut to trigger translation. Click **Capture** then press the desired combo (Esc to cancel). Reloads live — no restart. |
+| Auto-dismiss (s) | `5` | Seconds before the tooltip auto-closes. |
+| Target language | `vi` | Google Translate `tl=` param (e.g. `en`, `ja`, `zh`). |
+| Max chars | `5000` | Translation input is truncated to this size. |
+| HTTP timeout (s) | `5` | Translation request timeout. |
+| Screen W / H | `1920` / `1080` | Bounds used to clamp tooltip position. |
+
+Edit the JSON by hand if you prefer; the next launch picks it up.
+
+---
+
 ## Build for release
 
 ```bash

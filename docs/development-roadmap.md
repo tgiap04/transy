@@ -65,14 +65,27 @@
 
 ---
 
+## Phase 6: Config UI
+**Status:** ✅ Complete | **Completed:** 2026-06-06
+
+- [x] Persistent JSON config (5 hardcoded values + screen dims)
+- [x] Tray menu "Settings..." opens egui window
+- [x] Form fields: hotkey, auto-dismiss, target language, max chars, HTTP timeout, screen W/H
+- [x] Inline hotkey capture (press any combo inside the window)
+- [x] Live hotkey reload (no app restart required)
+- [x] Validation: hotkey parseable, language ASCII 2–10 chars, all numerics > 0
+- [x] Cross-platform config paths (macOS: `~/Library/Application Support/transy/`, Linux: `~/.config/transy/`)
+- [x] 21 unit tests + clippy clean
+
+---
+
 ## Future: v2.0 (TBD)
 
 | Feature | Priority |
 |---------|----------|
 | `.app` bundle for macOS + `.deb` package for Ubuntu | High |
 | Translation history / favorites | Medium |
-| Multiple target languages (user-configurable) | Medium |
-| Config file (`~/.config/transy/config.toml`) for customization | Low |
+| Auto-detect screen dimensions on first run (replace 1920×1080 default) | Medium |
 | Windows support | Not planned |
 
 ---

@@ -4,31 +4,30 @@ use egui::{Color32, Context, Margin, RichText};
 
 const BG_COLOR: Color32 = Color32::from_rgb(30, 30, 30);
 const TEXT_COLOR: Color32 = Color32::from_rgb(224, 224, 224);
-const AUTO_CLOSE_MS: u128 = 5000;
 
 const TOOLTIP_W: i32 = 320;
 const TOOLTIP_H: i32 = 80;
 const OFFSET: i32 = 15;
-const SCREEN_W: i32 = 1920;
-const SCREEN_H: i32 = 1080;
 
 pub struct TooltipApp {
     text: String,
     created_at: Instant,
+    auto_dismiss_ms: u128,
 }
 
 impl TooltipApp {
-    pub fn new(text: String) -> Self {
+    pub fn new(text: String, auto_dismiss_secs: u64) -> Self {
         Self {
             text,
             created_at: Instant::now(),
+            auto_dismiss_ms: u128::from(auto_dismiss_secs) * 1000,
         }
     }
 }
 
 impl eframe::App for TooltipApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        if self.created_at.elapsed().as_millis() >= AUTO_CLOSE_MS {
+        if self.created_at.elapsed().as_millis() >= self.auto_dismiss_ms {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             return;
         }
@@ -57,13 +56,13 @@ impl eframe::App for TooltipApp {
     }
 }
 
-pub fn clamp_position(cursor_x: i32, cursor_y: i32) -> (i32, i32) {
-    let x = (cursor_x + OFFSET).clamp(0, SCREEN_W - TOOLTIP_W);
-    let y = (cursor_y + OFFSET).clamp(0, SCREEN_H - TOOLTIP_H);
+pub fn clamp_position(cursor_x: i32, cursor_y: i32, screen_w: i32, screen_h: i32) -> (i32, i32) {
+    let x = (cursor_x + OFFSET).clamp(0, screen_w - TOOLTIP_W);
+    let y = (cursor_y + OFFSET).clamp(0, screen_h - TOOLTIP_H);
     (x, y)
 }
 
-pub fn run_tooltip(text: String, x: i32, y: i32) {
+pub fn run_tooltip(text: String, x: i32, y: i32, auto_dismiss_secs: u64) {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_decorations(false)
@@ -78,7 +77,7 @@ pub fn run_tooltip(text: String, x: i32, y: i32) {
     let _ = eframe::run_native(
         "transy",
         options,
-        Box::new(|_cc| Ok(Box::new(TooltipApp::new(text)))),
+        Box::new(|_cc| Ok(Box::new(TooltipApp::new(text, auto_dismiss_secs)))),
     );
 }
 
@@ -88,23 +87,23 @@ mod tests {
 
     #[test]
     fn clamp_normal_position() {
-        assert_eq!(clamp_position(100, 200), (115, 215));
+        assert_eq!(clamp_position(100, 200, 1920, 1080), (115, 215));
     }
 
     #[test]
     fn clamp_right_edge() {
         // 1800+15=1815 > 1920-320=1600
-        assert_eq!(clamp_position(1800, 100), (1600, 115));
+        assert_eq!(clamp_position(1800, 100, 1920, 1080), (1600, 115));
     }
 
     #[test]
     fn clamp_bottom_edge() {
         // 1050+15=1065 > 1080-80=1000
-        assert_eq!(clamp_position(100, 1050), (115, 1000));
+        assert_eq!(clamp_position(100, 1050, 1920, 1080), (115, 1000));
     }
 
     #[test]
     fn clamp_corner_negative_guards() {
-        assert_eq!(clamp_position(-50, -50), (0, 0));
+        assert_eq!(clamp_position(-50, -50, 1920, 1080), (0, 0));
     }
 }

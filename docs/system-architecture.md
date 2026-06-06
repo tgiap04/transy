@@ -126,3 +126,18 @@ Transy is a single-binary, on-demand translator. No daemon, no background servic
 | Mouse position | `core-graphics` crate | `xdotool` / wayland APIs |
 | Hotkey trigger | macOS Shortcuts.app | GNOME Custom Shortcuts (Settings → Keyboard) |
 | Binary format | Universal binary (arm64 + x86_64) | x86_64 ELF |
+| Config dir | `~/Library/Application Support/transy/` | `~/.config/transy/` |
+
+## Configuration
+
+User-editable settings persist to a JSON file (`config.json`) in the platform config dir. On first run, defaults are written. After every Save in the Settings window, the file is rewritten and a `mpsc::Sender<()>` notifies the tray host to live-reload the hotkey via `GlobalHotKeyManager::unregister/register` — no app restart.
+
+Shared state is wrapped in `Arc<Mutex<Config>>` and cloned to: the tray host (reads every event), the tooltip spawner (reads `auto_dismiss_secs`, `screen_w/h`), and the settings window thread (writes on Save). Lock poisoning is recovered via `.unwrap_or_else(|e| e.into_inner())`.
+
+**Fields (7 total):**
+- `hotkey: String` — e.g. `"Cmd+Shift+T"`, parsed by `global-hotkey`'s `FromStr`
+- `auto_dismiss_secs: u64` — tooltip lifetime
+- `target_language: String` — Google `tl=` param
+- `max_chars: usize` — input truncation limit
+- `timeout_secs: u64` — HTTP timeout
+- `screen_w: i32`, `screen_h: i32` — tooltip clamp bounds (default 1920×1080)

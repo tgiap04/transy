@@ -1,14 +1,42 @@
+#[cfg(target_os = "macos")]
+#[macro_use]
+extern crate objc;
+
+mod config;
 mod mouse;
+mod settings;
 mod tooltip;
 
+use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 use eframe::{App, NativeOptions};
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager};
-use global_hotkey::hotkey::{HotKey, Modifiers, Code};
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem};
-use tray_icon::{TrayIconBuilder, Icon};
+use tray_icon::{Icon, TrayIconBuilder};
 use transy_core::block_on;
+
+use crate::config::Config;
+
+const SETTINGS_ARG: &str = "--settings";
+
+/// Returns the path to the current executable so a child process can re-invoke
+/// the same binary with `--settings`.
+fn current_exe() -> std::path::PathBuf {
+    std::env::current_exe().expect("current executable path")
+}
+
+/// Spawn a new instance of this binary with `--settings` to open the Settings
+/// window. The child runs its own eframe event loop and exits when closed.
+fn spawn_settings_process() {
+    let exe = current_exe();
+    eprintln!("[transy] settings: spawning child process: {exe:?} {SETTINGS_ARG}");
+    match std::process::Command::new(&exe).arg(SETTINGS_ARG).spawn() {
+        Ok(child) => eprintln!("[transy] settings: child pid={}", child.id()),
+        Err(e) => eprintln!("[transy] settings ERROR: failed to spawn: {e}"),
+    }
+}
 
 #[cfg(target_os = "macos")]
 fn hide_dock_icon() {
@@ -18,28 +46,43 @@ fn hide_dock_icon() {
     }
 }
 
-fn trigger_tooltip() {
+fn trigger_tooltip(cfg: &Config) {
     let (cx, cy) = mouse::get_mouse_position();
-    let (tx, ty) = tooltip::clamp_position(cx, cy);
+    let (tx, ty) = tooltip::clamp_position(cx, cy, cfg.screen_w, cfg.screen_h);
 
     let text = match transy_core::capture_text() {
         Some(t) => t,
         None => return,
     };
 
-    let translated = match block_on(transy_core::translate(&text)) {
+    let translated = match block_on(transy_core::translate(
+        &text,
+        cfg.max_chars,
+        &cfg.target_language,
+        cfg.timeout_secs,
+    )) {
         Ok(t) => t,
         Err(e) => e.to_vietnamese().to_string(),
     };
 
-    tooltip::run_tooltip(translated, tx, ty);
+    tooltip::run_tooltip(translated, tx, ty, cfg.auto_dismiss_secs);
 }
 
-fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
+fn parse_hotkey_or_default(s: &str) -> HotKey {
+    Config::parse_hotkey(s).unwrap_or_else(|_| {
+        HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT)
+    })
+}
+
+fn build_tray_icon(
+    quit_flag: Arc<Mutex<bool>>,
+    cfg: Arc<Mutex<Config>>,
+) -> tray_icon::TrayIcon {
     let translate_item =
         MenuItem::with_id(MenuId::new("translate"), "Translate clipboard", true, None);
+    let settings_item = MenuItem::with_id(MenuId::new("settings"), "Settings...", true, None);
     let quit_item = MenuItem::with_id(MenuId::new("quit"), "Quit", true, None);
-    let menu = Menu::with_items(&[&translate_item, &quit_item]).expect("menu");
+    let menu = Menu::with_items(&[&translate_item, &settings_item, &quit_item]).expect("menu");
 
     let icon_bytes = include_bytes!("../assets/icon.png");
     let img = image::load_from_memory(icon_bytes).expect("valid icon");
@@ -48,8 +91,10 @@ fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
     let icon = Icon::from_rgba(rgba.into_raw(), w, h).expect("icon from RGBA");
 
     let translate_item_id = translate_item.id().clone();
+    let settings_item_id = settings_item.id().clone();
     let quit_item_id = quit_item.id().clone();
     let quit_flag_clone = Arc::clone(&quit_flag);
+    let cfg_clone = Arc::clone(&cfg);
 
     std::thread::spawn(move || loop {
         if let Ok(event) = MenuEvent::receiver().try_recv() {
@@ -59,7 +104,15 @@ fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
                     break;
                 }
                 s if s == translate_item_id.as_ref() => {
-                    trigger_tooltip();
+                    let snapshot = cfg_clone
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .clone();
+                    trigger_tooltip(&snapshot);
+                }
+                s if s == settings_item_id.as_ref() => {
+                    eprintln!("[transy] menu: Settings clicked — spawning settings window");
+                    spawn_settings_process();
                 }
                 _ => {}
             }
@@ -78,12 +131,16 @@ fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
 struct TrayHost {
     quit_flag: Arc<Mutex<bool>>,
     tray: Option<tray_icon::TrayIcon>,
+    config: Arc<Mutex<Config>>,
 }
 
 impl TrayHost {
-    fn new() -> Self {
-        let quit_flag = Arc::new(Mutex::new(false));
-        Self { quit_flag, tray: None }
+    fn new(config: Config) -> Self {
+        Self {
+            quit_flag: Arc::new(Mutex::new(false)),
+            tray: None,
+            config: Arc::new(Mutex::new(config)),
+        }
     }
 }
 
@@ -91,13 +148,21 @@ impl App for TrayHost {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // macOS requires tray icon created after event loop is running
         if self.tray.is_none() {
-            self.tray = Some(build_tray_icon(Arc::clone(&self.quit_flag)));
+            self.tray = Some(build_tray_icon(
+                Arc::clone(&self.quit_flag),
+                Arc::clone(&self.config),
+            ));
         }
 
         if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv()
             && event.state == global_hotkey::HotKeyState::Pressed
         {
-            trigger_tooltip();
+            let snapshot = self
+                .config
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+            trigger_tooltip(&snapshot);
         }
 
         if *self.quit_flag.lock().unwrap() {
@@ -109,15 +174,30 @@ impl App for TrayHost {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    // Standalone settings mode — run settings window and exit.
+    if args.len() > 1 && args[1] == SETTINGS_ARG {
+        eprintln!("[transy] settings mode: loading config...");
+        let config = Config::load();
+        let (reload_tx, _reload_rx) = mpsc::channel();
+        let shared = Arc::new(Mutex::new(config));
+        settings::run_settings(shared, reload_tx);
+        eprintln!("[transy] settings mode: done");
+        return;
+    }
+
+    // Normal tray host mode.
     #[cfg(target_os = "linux")]
     gtk::init().expect("failed to initialize GTK");
 
     #[cfg(target_os = "macos")]
     hide_dock_icon();
 
-    let manager = GlobalHotKeyManager::new().expect("hotkey manager");
-    let hotkey = HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT);
-    if let Err(e) = manager.register(hotkey) {
+    let config = Config::load();
+    let hotkey_manager = Arc::new(GlobalHotKeyManager::new().expect("hotkey manager"));
+    let initial_hotkey = parse_hotkey_or_default(&config.hotkey);
+    if let Err(e) = hotkey_manager.register(initial_hotkey) {
         eprintln!("hotkey error: {e}");
     }
 
@@ -131,6 +211,12 @@ fn main() {
         ..Default::default()
     };
 
-    eframe::run_native("Transy", options, Box::new(|_cc| Ok(Box::new(TrayHost::new()))))
-        .expect("eframe");
+    eframe::run_native(
+        "Transy",
+        options,
+        Box::new(move |_cc| {
+            Ok(Box::new(TrayHost::new(config)))
+        }),
+    )
+    .expect("eframe");
 }

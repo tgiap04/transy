@@ -4,7 +4,7 @@
 #[tokio::test]
 #[ignore = "requires network"]
 async fn translate_english_to_vietnamese() {
-    let result = transy_core::translate("hello").await;
+    let result = transy_core::translate("hello", 5000, "vi", 5).await;
     assert!(result.is_ok(), "translation failed: {:?}", result.err());
     let text = result.unwrap();
     assert!(!text.is_empty(), "translation returned empty string");
@@ -13,7 +13,7 @@ async fn translate_english_to_vietnamese() {
 #[tokio::test]
 #[ignore = "requires network"]
 async fn translate_cjk_to_vietnamese() {
-    let result = transy_core::translate("你好").await;
+    let result = transy_core::translate("你好", 5000, "vi", 5).await;
     assert!(result.is_ok());
     assert!(!result.unwrap().is_empty());
 }
@@ -22,5 +22,5 @@ async fn translate_cjk_to_vietnamese() {
 #[ignore = "requires network"]
 async fn translate_emoji_does_not_panic() {
     // Either succeeds or fails gracefully — must not panic
-    let _ = transy_core::translate("Hello 🎉").await;
+    let _ = transy_core::translate("Hello 🎉", 5000, "vi", 5).await;
 }

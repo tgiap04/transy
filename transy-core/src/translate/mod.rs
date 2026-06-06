@@ -16,6 +16,11 @@ impl TranslationError {
     }
 }
 
-pub async fn translate(text: &str) -> Result<String, TranslationError> {
-    client::call_translate_api(text).await
+pub async fn translate(
+    text: &str,
+    max_chars: usize,
+    target_lang: &str,
+    timeout_secs: u64,
+) -> Result<String, TranslationError> {
+    client::call_translate_api(text, max_chars, target_lang, timeout_secs).await
 }

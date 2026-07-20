@@ -1,11 +1,16 @@
 use std::process::Command;
 
 pub fn capture_macos() -> Option<String> {
-    // Primary: text passed as first CLI argument by macOS Shortcuts
+    // Primary: text passed as a CLI argument by macOS Shortcuts. Our own mode
+    // flags (`--translate`, `--settings`) are NOT selection text — skip them,
+    // otherwise a hotkey-spawned `--translate` run would translate the flag
+    // itself instead of falling through to the clipboard.
     if let Some(arg) = std::env::args().nth(1) {
-        let trimmed = arg.trim().to_string();
-        if !trimmed.is_empty() {
-            return Some(trimmed);
+        if !arg.starts_with("--") {
+            let trimmed = arg.trim().to_string();
+            if !trimmed.is_empty() {
+                return Some(trimmed);
+            }
         }
     }
 

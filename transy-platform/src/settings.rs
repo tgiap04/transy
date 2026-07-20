@@ -183,11 +183,11 @@ impl SettingsApp {
         // mirror the chosen combo into the GNOME custom shortcut that runs
         // `--translate`. Keep the window open on failure so the user sees why.
         #[cfg(target_os = "linux")]
-        if crate::gnome_shortcut::is_gnome() {
-            if let Err(e) = crate::gnome_shortcut::sync_translate_shortcut(&self.config.hotkey) {
-                self.error = format!("Config saved, but GNOME shortcut sync failed: {e}");
-                return;
-            }
+        if crate::gnome_shortcut::is_gnome()
+            && let Err(e) = crate::gnome_shortcut::sync_translate_shortcut(&self.config.hotkey)
+        {
+            self.error = format!("Config saved, but GNOME shortcut sync failed: {e}");
+            return;
         }
 
         if let Ok(mut guard) = self.shared.lock() {
@@ -438,15 +438,14 @@ mod tests {
 
     #[test]
     fn parse_round_trip() {
-        let s = "Cmd+Shift+T";
-        let (key, mods) = parse_hotkey_string(s).expect("parses");
+        // Cmd and Super are the same modifier bit; the prefix `format_hotkey`
+        // emits is platform-dependent ("Cmd" on macOS, "Super" elsewhere). So
+        // assert the round-trip on the parsed (key, modifiers) — which is stable
+        // across platforms — rather than on the string tokens.
+        let (key, mods) = parse_hotkey_string("Cmd+Shift+T").expect("parses");
         let formatted = format_hotkey(key, mods).expect("formats back");
-        // Both forms should normalize to the same lowercase "cmd" -> "Cmd"/"Super" prefix
-        let normalized_in = s.to_ascii_lowercase();
-        let normalized_out = formatted.to_ascii_lowercase();
-        assert!(
-            normalized_in.split('+').all(|p| normalized_out.contains(p)),
-            "{normalized_in} should be subset of {normalized_out}"
-        );
+        let (key2, mods2) = parse_hotkey_string(&formatted).expect("re-parses");
+        assert_eq!(key, key2);
+        assert_eq!(mods, mods2);
     }
 }

@@ -212,9 +212,13 @@ fn main() {
     }
 
     // One-shot translate mode — capture selection, translate, show the tooltip,
-    // exit. Bind this to a desktop shortcut (e.g. GNOME Custom Shortcut) so it
-    // works regardless of the compositor: `transy-platform --translate`.
+    // exit. Triggered by the in-app hotkey (macOS/X11) or a desktop shortcut
+    // (GNOME): `transy-platform --translate`.
     if args.len() > 1 && args[1] == TRANSLATE_ARG {
+        // Run this transient popup as an accessory app so it doesn't flash a
+        // Dock icon or steal the menu bar on macOS.
+        #[cfg(target_os = "macos")]
+        hide_dock_icon();
         let config = Config::load();
         trigger_tooltip(&config);
         return;

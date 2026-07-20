@@ -97,8 +97,10 @@ pub fn run_settings(shared: Arc<Mutex<Config>>, reload_tx: Sender<()>) {
         // don't activate automatically. Force activation so the settings
         // window appears frontmost instead of opening in the background.
         use cocoa::appkit::{NSApp, NSApplication};
+        use cocoa::base::YES;
         unsafe {
-            NSApp().activateIgnoringOtherApps_(true);
+            // Objective-C BOOL is an i8, not a Rust bool.
+            NSApp().activateIgnoringOtherApps_(YES);
         }
     }
 

@@ -19,9 +19,9 @@ use std::sync::{Arc, Mutex};
 use eframe::{App, NativeOptions};
 use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager};
+use transy_core::block_on;
 use tray_icon::menu::{Menu, MenuEvent, MenuId, MenuItem};
 use tray_icon::{Icon, TrayIconBuilder};
-use transy_core::block_on;
 
 use crate::config::Config;
 
@@ -96,9 +96,8 @@ fn trigger_tooltip(cfg: &Config) {
 }
 
 fn parse_hotkey_or_default(s: &str) -> HotKey {
-    Config::parse_hotkey(s).unwrap_or_else(|_| {
-        HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT)
-    })
+    Config::parse_hotkey(s)
+        .unwrap_or_else(|_| HotKey::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyT))
 }
 
 fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
@@ -119,26 +118,28 @@ fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
     let quit_item_id = quit_item.id().clone();
     let quit_flag_clone = Arc::clone(&quit_flag);
 
-    std::thread::spawn(move || loop {
-        if let Ok(event) = MenuEvent::receiver().try_recv() {
-            match event.id.as_ref() {
-                s if s == quit_item_id.as_ref() => {
-                    *quit_flag_clone.lock().unwrap() = true;
-                    break;
+    std::thread::spawn(move || {
+        loop {
+            if let Ok(event) = MenuEvent::receiver().try_recv() {
+                match event.id.as_ref() {
+                    s if s == quit_item_id.as_ref() => {
+                        *quit_flag_clone.lock().unwrap() = true;
+                        break;
+                    }
+                    s if s == translate_item_id.as_ref() => {
+                        // Spawn a one-shot child instead of running the tooltip on
+                        // this worker thread — winit event loops must be created on
+                        // the main thread of their own process.
+                        spawn_translate_process();
+                    }
+                    s if s == settings_item_id.as_ref() => {
+                        spawn_settings_process();
+                    }
+                    _ => {}
                 }
-                s if s == translate_item_id.as_ref() => {
-                    // Spawn a one-shot child instead of running the tooltip on
-                    // this worker thread — winit event loops must be created on
-                    // the main thread of their own process.
-                    spawn_translate_process();
-                }
-                s if s == settings_item_id.as_ref() => {
-                    spawn_settings_process();
-                }
-                _ => {}
             }
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
-        std::thread::sleep(std::time::Duration::from_millis(50));
     });
 
     TrayIconBuilder::new()
@@ -251,9 +252,7 @@ fn main() {
     eframe::run_native(
         "Transy",
         options,
-        Box::new(move |_cc| {
-            Ok(Box::new(TrayHost::new()))
-        }),
+        Box::new(move |_cc| Ok(Box::new(TrayHost::new()))),
     )
     .expect("eframe");
 }

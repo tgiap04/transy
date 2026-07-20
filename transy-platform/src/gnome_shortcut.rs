@@ -44,8 +44,8 @@ pub fn to_gnome_binding(hotkey: &str) -> Option<String> {
 /// keybinding entry if it does not exist yet. Returns `Err` (and changes
 /// nothing durable) when gsettings or the GNOME schema is unavailable.
 pub fn sync_translate_shortcut(hotkey: &str) -> Result<(), String> {
-    let binding = to_gnome_binding(hotkey)
-        .ok_or_else(|| format!("hotkey '{hotkey}' has no main key"))?;
+    let binding =
+        to_gnome_binding(hotkey).ok_or_else(|| format!("hotkey '{hotkey}' has no main key"))?;
     let exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let command = format!("{} --translate", exe.display());
 
@@ -140,22 +140,34 @@ mod tests {
 
     #[test]
     fn converts_ctrl_alt_letter() {
-        assert_eq!(to_gnome_binding("Ctrl+Alt+K").as_deref(), Some("<Control><Alt>k"));
+        assert_eq!(
+            to_gnome_binding("Ctrl+Alt+K").as_deref(),
+            Some("<Control><Alt>k")
+        );
     }
 
     #[test]
     fn converts_super_shift_letter() {
-        assert_eq!(to_gnome_binding("Super+Shift+T").as_deref(), Some("<Super><Shift>t"));
+        assert_eq!(
+            to_gnome_binding("Super+Shift+T").as_deref(),
+            Some("<Super><Shift>t")
+        );
     }
 
     #[test]
     fn converts_alt_shift_letter() {
-        assert_eq!(to_gnome_binding("Alt+Shift+N").as_deref(), Some("<Alt><Shift>n"));
+        assert_eq!(
+            to_gnome_binding("Alt+Shift+N").as_deref(),
+            Some("<Alt><Shift>n")
+        );
     }
 
     #[test]
     fn cmd_maps_to_super() {
-        assert_eq!(to_gnome_binding("Cmd+Shift+T").as_deref(), Some("<Super><Shift>t"));
+        assert_eq!(
+            to_gnome_binding("Cmd+Shift+T").as_deref(),
+            Some("<Super><Shift>t")
+        );
     }
 
     #[test]

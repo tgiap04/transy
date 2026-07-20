@@ -19,7 +19,11 @@ fn format_hotkey(key: Key, mods: Modifiers) -> Option<String> {
     }
     let mut parts: Vec<&'static str> = Vec::new();
     if mods.command {
-        parts.push(if cfg!(target_os = "macos") { "Cmd" } else { "Super" });
+        parts.push(if cfg!(target_os = "macos") {
+            "Cmd"
+        } else {
+            "Super"
+        });
     }
     if mods.ctrl && !mods.command {
         parts.push("Ctrl");
@@ -85,10 +89,7 @@ fn parse_hotkey_string(s: &str) -> Option<(Key, Modifiers)> {
 pub fn run_settings(shared: Arc<Mutex<Config>>, reload_tx: Sender<()>) {
     eprintln!("[transy] settings: run_settings() called");
 
-    let initial = shared
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .clone();
+    let initial = shared.lock().unwrap_or_else(|e| e.into_inner()).clone();
 
     #[cfg(target_os = "macos")]
     {
@@ -155,7 +156,12 @@ impl SettingsApp {
         if self.config.target_language.trim().is_empty() {
             return Err("Target language cannot be empty".to_string());
         }
-        if !self.config.target_language.chars().all(|c| c.is_ascii_alphabetic()) {
+        if !self
+            .config
+            .target_language
+            .chars()
+            .all(|c| c.is_ascii_alphabetic())
+        {
             return Err("Target language must be ASCII letters only".to_string());
         }
         if self.config.target_language.len() < 2 || self.config.target_language.len() > 10 {
@@ -258,23 +264,17 @@ impl eframe::App for SettingsApp {
                             } else {
                                 self.config.hotkey.clone()
                             };
-                            let field =
-                                ui.add_sized([200.0, 24.0], egui::Button::new(label));
+                            let field = ui.add_sized([200.0, 24.0], egui::Button::new(label));
                             if field.clicked() {
                                 self.capture_mode = true;
                             }
-                            field.on_hover_text(
-                                "Click, then press the combo (e.g. Ctrl+Alt+K)",
-                            );
+                            field.on_hover_text("Click, then press the combo (e.g. Ctrl+Alt+K)");
                         }
                     });
                     ui.end_row();
 
                     ui.label("Auto-dismiss (s)");
-                    ui.add(
-                        egui::DragValue::new(&mut self.config.auto_dismiss_secs)
-                            .range(1..=60),
-                    );
+                    ui.add(egui::DragValue::new(&mut self.config.auto_dismiss_secs).range(1..=60));
                     ui.end_row();
 
                     ui.label("Target language");
@@ -394,7 +394,11 @@ mod tests {
             ..Default::default()
         };
         let s = format_hotkey(Key::T, m).expect("formats");
-        let prefix = if cfg!(target_os = "macos") { "Cmd" } else { "Super" };
+        let prefix = if cfg!(target_os = "macos") {
+            "Cmd"
+        } else {
+            "Super"
+        };
         assert_eq!(s, format!("{prefix}+Shift+T"));
     }
 
@@ -409,7 +413,11 @@ mod tests {
             ..Default::default()
         };
         let s = format_hotkey(Key::A, m).expect("formats");
-        let prefix = if cfg!(target_os = "macos") { "Cmd" } else { "Super" };
+        let prefix = if cfg!(target_os = "macos") {
+            "Cmd"
+        } else {
+            "Super"
+        };
         assert_eq!(s, format!("{prefix}+A"));
     }
 

@@ -9,5 +9,11 @@ tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# Read the PRIMARY selection natively via the X server. On Wayland this goes
+# through XWayland (which bridges the selection), so no external clipboard
+# binary (wl-paste/xclip) needs to be installed by the user.
+[target.'cfg(target_os = "linux")'.dependencies]
+x11-clipboard = "0.9"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }

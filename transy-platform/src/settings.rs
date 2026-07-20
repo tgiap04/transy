@@ -178,6 +178,18 @@ impl SettingsApp {
             self.error = "Failed to write config.json".to_string();
             return;
         }
+
+        // On GNOME the in-app hotkey never fires (global-hotkey is X11-only), so
+        // mirror the chosen combo into the GNOME custom shortcut that runs
+        // `--translate`. Keep the window open on failure so the user sees why.
+        #[cfg(target_os = "linux")]
+        if crate::gnome_shortcut::is_gnome() {
+            if let Err(e) = crate::gnome_shortcut::sync_translate_shortcut(&self.config.hotkey) {
+                self.error = format!("Config saved, but GNOME shortcut sync failed: {e}");
+                return;
+            }
+        }
+
         if let Ok(mut guard) = self.shared.lock() {
             *guard = self.config.clone();
         }
@@ -228,19 +240,32 @@ impl eframe::App for SettingsApp {
                 .show(ui, |ui| {
                     ui.label("Hotkey");
                     ui.horizontal(|ui| {
-                        let resp = ui.add_enabled(
-                            !self.capture_mode,
-                            egui::TextEdit::singleline(&mut self.config.hotkey),
-                        );
-                        resp.clone().on_hover_text("Format: Cmd+Shift+T, Ctrl+Alt+K, ...");
-                        // Request keyboard focus on the TextEdit when entering capture
-                        // mode so egui routes key events here immediately.
+                        // Click-to-capture: clicking the field itself starts capture,
+                        // so the natural "click the box then press the combo" gesture
+                        // works without a separate button. While capturing, the field
+                        // is a non-interactive prompt so Space/Enter don't toggle it.
                         if self.capture_mode {
-                            resp.request_focus();
-                        }
-                        let btn_label = if self.capture_mode { "Cancel" } else { "Capture" };
-                        if ui.button(btn_label).clicked() {
-                            self.capture_mode = !self.capture_mode;
+                            ui.add_sized(
+                                [200.0, 24.0],
+                                egui::Label::new(
+                                    egui::RichText::new("Press combo… (Esc to cancel)")
+                                        .color(egui::Color32::from_rgb(120, 180, 240)),
+                                ),
+                            );
+                        } else {
+                            let label = if self.config.hotkey.trim().is_empty() {
+                                "(click to set hotkey)".to_owned()
+                            } else {
+                                self.config.hotkey.clone()
+                            };
+                            let field =
+                                ui.add_sized([200.0, 24.0], egui::Button::new(label));
+                            if field.clicked() {
+                                self.capture_mode = true;
+                            }
+                            field.on_hover_text(
+                                "Click, then press the combo (e.g. Ctrl+Alt+K)",
+                            );
                         }
                     });
                     ui.end_row();
@@ -272,13 +297,6 @@ impl eframe::App for SettingsApp {
                     ui.add(egui::DragValue::new(&mut self.config.screen_h).range(240..=10_000));
                     ui.end_row();
                 });
-
-            if self.capture_mode {
-                ui.colored_label(
-                    egui::Color32::from_rgb(120, 180, 240),
-                    "Press desired key combo (Esc to cancel)",
-                );
-            }
 
             ui.add_space(8.0);
             match self.validate() {

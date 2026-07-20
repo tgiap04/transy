@@ -7,6 +7,8 @@
 extern crate objc;
 
 mod config;
+#[cfg(target_os = "linux")]
+mod gnome_shortcut;
 mod mouse;
 mod settings;
 mod tooltip;
@@ -24,9 +26,10 @@ use transy_core::block_on;
 use crate::config::Config;
 
 const SETTINGS_ARG: &str = "--settings";
+const TRANSLATE_ARG: &str = "--translate";
 
 /// Returns the path to the current executable so a child process can re-invoke
-/// the same binary with `--settings`.
+/// the same binary with a mode flag.
 fn current_exe() -> std::path::PathBuf {
     std::env::current_exe().expect("current executable path")
 }
@@ -34,11 +37,22 @@ fn current_exe() -> std::path::PathBuf {
 /// Spawn a new instance of this binary with `--settings` to open the Settings
 /// window. The child runs its own eframe event loop and exits when closed.
 fn spawn_settings_process() {
+    spawn_child(SETTINGS_ARG);
+}
+
+/// Spawn a one-shot `--translate` child: it captures the selection, translates,
+/// shows the tooltip and exits. Running the tooltip in a fresh process gives it
+/// its own single main-thread event loop — winit forbids creating a second
+/// event loop inside the resident tray's running loop or on a worker thread.
+fn spawn_translate_process() {
+    spawn_child(TRANSLATE_ARG);
+}
+
+fn spawn_child(arg: &str) {
     let exe = current_exe();
-    eprintln!("[transy] settings: spawning child process: {exe:?} {SETTINGS_ARG}");
-    match std::process::Command::new(&exe).arg(SETTINGS_ARG).spawn() {
-        Ok(child) => eprintln!("[transy] settings: child pid={}", child.id()),
-        Err(e) => eprintln!("[transy] settings ERROR: failed to spawn: {e}"),
+    match std::process::Command::new(&exe).arg(arg).spawn() {
+        Ok(child) => eprintln!("[transy] spawned child pid={} ({arg})", child.id()),
+        Err(e) => eprintln!("[transy] ERROR: failed to spawn {arg}: {e}"),
     }
 }
 
@@ -50,13 +64,22 @@ fn hide_dock_icon() {
     }
 }
 
+/// Capture the current selection, translate it and show the tooltip. MUST run
+/// on the main thread of a process with no other event loop (i.e. the
+/// `--translate` one-shot child), because `run_tooltip` starts a winit loop.
 fn trigger_tooltip(cfg: &Config) {
     let (cx, cy) = mouse::get_mouse_position();
     let (tx, ty) = tooltip::clamp_position(cx, cy, cfg.screen_w, cfg.screen_h);
 
     let text = match transy_core::capture_text() {
         Some(t) => t,
-        None => return,
+        None => {
+            eprintln!(
+                "[transy] no selection captured — is a clipboard tool installed? \
+                 (Wayland: wl-clipboard / X11: xclip)"
+            );
+            return;
+        }
     };
 
     let translated = match block_on(transy_core::translate(
@@ -78,10 +101,7 @@ fn parse_hotkey_or_default(s: &str) -> HotKey {
     })
 }
 
-fn build_tray_icon(
-    quit_flag: Arc<Mutex<bool>>,
-    cfg: Arc<Mutex<Config>>,
-) -> tray_icon::TrayIcon {
+fn build_tray_icon(quit_flag: Arc<Mutex<bool>>) -> tray_icon::TrayIcon {
     let translate_item =
         MenuItem::with_id(MenuId::new("translate"), "Translate clipboard", true, None);
     let settings_item = MenuItem::with_id(MenuId::new("settings"), "Settings...", true, None);
@@ -98,7 +118,6 @@ fn build_tray_icon(
     let settings_item_id = settings_item.id().clone();
     let quit_item_id = quit_item.id().clone();
     let quit_flag_clone = Arc::clone(&quit_flag);
-    let cfg_clone = Arc::clone(&cfg);
 
     std::thread::spawn(move || loop {
         if let Ok(event) = MenuEvent::receiver().try_recv() {
@@ -108,14 +127,12 @@ fn build_tray_icon(
                     break;
                 }
                 s if s == translate_item_id.as_ref() => {
-                    let snapshot = cfg_clone
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .clone();
-                    trigger_tooltip(&snapshot);
+                    // Spawn a one-shot child instead of running the tooltip on
+                    // this worker thread — winit event loops must be created on
+                    // the main thread of their own process.
+                    spawn_translate_process();
                 }
                 s if s == settings_item_id.as_ref() => {
-                    eprintln!("[transy] menu: Settings clicked — spawning settings window");
                     spawn_settings_process();
                 }
                 _ => {}
@@ -135,15 +152,13 @@ fn build_tray_icon(
 struct TrayHost {
     quit_flag: Arc<Mutex<bool>>,
     tray: Option<tray_icon::TrayIcon>,
-    config: Arc<Mutex<Config>>,
 }
 
 impl TrayHost {
-    fn new(config: Config) -> Self {
+    fn new() -> Self {
         Self {
             quit_flag: Arc::new(Mutex::new(false)),
             tray: None,
-            config: Arc::new(Mutex::new(config)),
         }
     }
 }
@@ -152,21 +167,26 @@ impl App for TrayHost {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         // macOS requires tray icon created after event loop is running
         if self.tray.is_none() {
-            self.tray = Some(build_tray_icon(
-                Arc::clone(&self.quit_flag),
-                Arc::clone(&self.config),
-            ));
+            self.tray = Some(build_tray_icon(Arc::clone(&self.quit_flag)));
         }
 
+        // Linux: eframe runs the winit event loop, not the GTK one. The
+        // `tray-icon` AppIndicator needs the GTK/glib main loop pumped so it can
+        // finish registering with the StatusNotifierWatcher (otherwise the icon
+        // never appears on the panel) and dispatch tray menu events. `update`
+        // runs on the main thread — the only place GTK may be driven.
+        #[cfg(target_os = "linux")]
+        while gtk::events_pending() {
+            gtk::main_iteration_do(false);
+        }
+
+        // In-app global hotkey (X11 only — global-hotkey has no Wayland backend).
+        // Spawn a one-shot child rather than running the tooltip inside this
+        // already-running event loop.
         if let Ok(event) = GlobalHotKeyEvent::receiver().try_recv()
             && event.state == global_hotkey::HotKeyState::Pressed
         {
-            let snapshot = self
-                .config
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .clone();
-            trigger_tooltip(&snapshot);
+            spawn_translate_process();
         }
 
         if *self.quit_flag.lock().unwrap() {
@@ -188,6 +208,15 @@ fn main() {
         let shared = Arc::new(Mutex::new(config));
         settings::run_settings(shared, reload_tx);
         eprintln!("[transy] settings mode: done");
+        return;
+    }
+
+    // One-shot translate mode — capture selection, translate, show the tooltip,
+    // exit. Bind this to a desktop shortcut (e.g. GNOME Custom Shortcut) so it
+    // works regardless of the compositor: `transy-platform --translate`.
+    if args.len() > 1 && args[1] == TRANSLATE_ARG {
+        let config = Config::load();
+        trigger_tooltip(&config);
         return;
     }
 
@@ -219,7 +248,7 @@ fn main() {
         "Transy",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(TrayHost::new(config)))
+            Ok(Box::new(TrayHost::new()))
         }),
     )
     .expect("eframe");

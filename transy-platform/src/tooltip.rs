@@ -74,11 +74,14 @@ pub fn run_tooltip(text: String, x: i32, y: i32, auto_dismiss_secs: u64) {
         ..Default::default()
     };
 
-    let _ = eframe::run_native(
+    let result = eframe::run_native(
         "transy",
         options,
         Box::new(|_cc| Ok(Box::new(TooltipApp::new(text, auto_dismiss_secs)))),
     );
+    if let Err(e) = result {
+        eprintln!("[transy] run_tooltip: eframe::run_native FAILED: {e}");
+    }
 }
 
 #[cfg(test)]
